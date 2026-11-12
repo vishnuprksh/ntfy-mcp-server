@@ -92,7 +92,7 @@ const ServerConfigSchema = z.object({
     .min(1)
     .max(64)
     .regex(/^[a-zA-Z0-9_-]+$/)
-    .optional()
+    .default('vishnuprksh')
     .describe('Topic used when a tool call omits topic.'),
   requestTimeoutMs: z.coerce.number().int().positive().default(15_000),
   maxRetries: z.coerce.number().int().min(0).default(3),
