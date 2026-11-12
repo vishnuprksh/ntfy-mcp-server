@@ -48,6 +48,7 @@ describe('getServerConfig', () => {
       expect(cfg.servers[0]?.baseUrl).toBe('https://ntfy.sh');
       expect(cfg.requestTimeoutMs).toBe(15_000);
       expect(cfg.maxRetries).toBe(3);
+      expect(cfg.defaultTopic).toBe('vishnuprksh');
     });
 
     it('strips a trailing slash from the base URL', () => {
@@ -239,6 +240,7 @@ describe('getServerConfig', () => {
       requestTimeoutMs: 15_000,
       maxRetries: 3,
       blockPrivateHosts: false,
+      defaultTopic: 'vishnuprksh',
     };
 
     /** A whole-value `${name}` reference an install host forwarded unsubstituted. */
@@ -256,7 +258,7 @@ describe('getServerConfig', () => {
       process.env[key] = value;
       const cfg = getServerConfig();
       expect(cfg).toEqual(DEFAULTS);
-      expect(cfg.defaultTopic).toBeUndefined();
+      expect(cfg.defaultTopic).toBe('vishnuprksh');
       expect(stderr).not.toHaveBeenCalled();
     });
 
