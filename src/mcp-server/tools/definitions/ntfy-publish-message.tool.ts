@@ -16,7 +16,7 @@
 import { tool, z } from '@cyanheads/mcp-ts-core';
 import { JsonRpcErrorCode, validationError } from '@cyanheads/mcp-ts-core/errors';
 
-import { getServerConfig, isEmojiTagsEnabled } from '@/config/server-config.js';
+import { isEmojiTagsEnabled } from '@/config/server-config.js';
 import { confirmAction } from '@/mcp-server/tools/utils/confirm-action.js';
 import { literal, literalBlock } from '@/mcp-server/tools/utils/markdown-literal.js';
 import {
@@ -48,14 +48,14 @@ import type {
   Priority,
 } from '@/services/ntfy/types.js';
 
-const TOPIC_REGEX = /^[a-zA-Z0-9_-]+$/;
 const SEQUENCE_ID_REGEX = /^[a-zA-Z0-9_-]{1,64}$/;
 /** ntfy's message-body ceiling. Counted in bytes upstream, not characters. */
 const MESSAGE_MAX_BYTES = 4096;
 /** The pointers at `ntfy_search_emoji_tags` are dropped when that tool is disabled. */
 const EMOJI_TAGS_ENABLED = isEmojiTagsEnabled();
 
-const TopicSchema = z.string().min(1).max(64).regex(TOPIC_REGEX);
+const ALLOWED_TOPIC = 'vishnuprksh';
+const TopicSchema = z.literal(ALLOWED_TOPIC);
 
 const ViewActionSchema = z
   .object({
@@ -161,7 +161,7 @@ const AttachmentSchema = z
 
 const InputSchema = z.object({
   topic: TopicSchema.optional().describe(
-    'Target topic. Required unless `NTFY_DEFAULT_TOPIC` is configured. Treat the topic name as a secret — anyone who knows it can publish or subscribe.',
+    'Only the `vishnuprksh` topic is permitted. Omit this field or pass `vishnuprksh`; other topics are rejected. Treat the topic name as a secret — anyone who knows it can publish or subscribe.',
   ),
   message: z
     .string()
@@ -454,13 +454,10 @@ export const ntfyPublishMessage = tool('ntfy_publish_message', {
   ],
 
   async handler(input: Input, ctx): Promise<Output> {
-    const cfg = getServerConfig();
-    const topic = input.topic ?? cfg.defaultTopic;
-    if (!topic) {
-      throw validationError('Topic is required when NTFY_DEFAULT_TOPIC is unset.', {
-        recovery: {
-          hint: 'Pass a `topic` argument or configure NTFY_DEFAULT_TOPIC on the server.',
-        },
+    const topic = input.topic ?? ALLOWED_TOPIC;
+    if (topic !== ALLOWED_TOPIC) {
+      throw validationError('Only the `vishnuprksh` topic is permitted for publishing.', {
+        recovery: { hint: 'Omit `topic` or pass `vishnuprksh` to publish a notification.' },
       });
     }
 
