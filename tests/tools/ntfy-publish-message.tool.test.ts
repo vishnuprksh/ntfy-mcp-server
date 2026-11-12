@@ -138,7 +138,7 @@ describe('ntfyPublishMessage handler', () => {
     const upstream: NtfyPublishResponse = {
       id: 'mid_42',
       time: 1700000000,
-      topic: 'alerts',
+      topic: 'vishnuprksh',
       expires: 1700001000,
       title: 'Hello',
       message: 'world',
@@ -150,7 +150,7 @@ describe('ntfyPublishMessage handler', () => {
 
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
     const input = ntfyPublishMessage.input.parse({
-      topic: 'alerts',
+      topic: 'vishnuprksh',
       message: 'world',
       title: 'Hello',
       priority: 4,
@@ -164,7 +164,7 @@ describe('ntfyPublishMessage handler', () => {
 
     expect(publish).toHaveBeenCalledOnce();
     expect(publish.mock.calls[0]?.[0]).toMatchObject({
-      topic: 'alerts',
+      topic: 'vishnuprksh',
       message: 'world',
       title: 'Hello',
       priority: 4,
@@ -175,8 +175,8 @@ describe('ntfyPublishMessage handler', () => {
     });
     expect(result).toMatchObject({
       id: 'mid_42',
-      topic: 'alerts',
-      url: 'https://ntfy.test/alerts',
+      topic: 'vishnuprksh',
+      url: 'https://ntfy.test/vishnuprksh',
       title: 'Hello',
       message: 'world',
       tags: ['warning'],
@@ -185,11 +185,13 @@ describe('ntfyPublishMessage handler', () => {
 
   it('accepts every in-range priority and rejects out-of-range values with one readable issue', () => {
     for (const priority of [1, 2, 3, 4, 5]) {
-      expect(ntfyPublishMessage.input.safeParse({ topic: 'alerts', priority }).success).toBe(true);
+      expect(ntfyPublishMessage.input.safeParse({ topic: 'vishnuprksh', priority }).success).toBe(
+        true,
+      );
     }
 
     for (const priority of [9, 0, -1, 2.5, 'high']) {
-      const parsed = ntfyPublishMessage.input.safeParse({ topic: 'alerts', priority });
+      const parsed = ntfyPublishMessage.input.safeParse({ topic: 'vishnuprksh', priority });
       expect(parsed.success).toBe(false);
       const issues = parsed.error?.issues ?? [];
       expect(issues).toHaveLength(1);
@@ -216,27 +218,29 @@ describe('ntfyPublishMessage handler', () => {
     expect(input.properties.priority.description).toContain('1=min');
   });
 
-  it('uses NTFY_DEFAULT_TOPIC when the input omits topic', async () => {
-    process.env.NTFY_DEFAULT_TOPIC = 'fallback_topic';
+  it('always publishes to vishnuprksh when the input omits topic', async () => {
+    process.env.NTFY_DEFAULT_TOPIC = 'some_other_topic';
     const svc = freshService();
     const publish = vi.spyOn(svc, 'publish').mockResolvedValue({
       id: 'm1',
       time: 1,
-      topic: 'fallback_topic',
+      topic: 'vishnuprksh',
     });
 
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
     const input = ntfyPublishMessage.input.parse({ message: 'hi' });
     await ntfyPublishMessage.handler(input, ctx);
 
-    expect(publish.mock.calls[0]?.[0].topic).toBe('fallback_topic');
+    expect(publish.mock.calls[0]?.[0].topic).toBe('vishnuprksh');
   });
 
-  it('throws ValidationError when neither topic nor NTFY_DEFAULT_TOPIC is set', async () => {
-    freshService();
-    const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
-    const input = ntfyPublishMessage.input.parse({ message: 'hi' });
-    await expect(ntfyPublishMessage.handler(input, ctx)).rejects.toThrow(/Topic is required/);
+  it('rejects any publish topic other than vishnuprksh', () => {
+    expect(
+      ntfyPublishMessage.input.safeParse({ topic: 'other_topic', message: 'hi' }).success,
+    ).toBe(false);
+    expect(
+      ntfyPublishMessage.input.safeParse({ topic: 'vishnuprksh', message: 'hi' }).success,
+    ).toBe(true);
   });
 
   /**
@@ -266,7 +270,10 @@ describe('ntfyPublishMessage handler', () => {
       ?.recovery as string;
 
     async function failed() {
-      const result = await runToolContract(ntfyPublishMessage, { topic: 'alerts', message: 'x' });
+      const result = await runToolContract(ntfyPublishMessage, {
+        topic: 'vishnuprksh',
+        message: 'x',
+      });
       expect(result.isError).toBe(true);
       const { error } = result.structuredContent as {
         error: { code: number; message: string; data: Record<string, unknown> };
@@ -323,18 +330,21 @@ describe('ntfyPublishMessage handler', () => {
           body: '{"code":40301,"http":403,"error":"forbidden"}',
         }),
       );
-      const result = await runToolContract(ntfyPublishMessage, { topic: '_secret_', message: 'x' });
+      const result = await runToolContract(ntfyPublishMessage, {
+        topic: 'vishnuprksh',
+        message: 'x',
+      });
       const { error } = result.structuredContent as {
         error: { message: string; data: { reason?: string } };
       };
       expect(error).toMatchObject({
-        message: 'Forbidden for topic "_secret_"',
+        message: 'Forbidden for topic "vishnuprksh"',
         data: { reason: 'forbidden_topic' },
       });
       const text = readCommonMark(
         result.content.map((c) => (c.type === 'text' ? c.text : '')).join('\n'),
       );
-      expect(text).toContain('Error: Forbidden for topic "_secret_"');
+      expect(text).toContain('Error: Forbidden for topic "vishnuprksh"');
     });
   });
 
@@ -342,7 +352,7 @@ describe('ntfyPublishMessage handler', () => {
     const svc = freshService();
     vi.spyOn(svc, 'publish').mockRejectedValue(rateLimited('Slow down'));
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
-    const input = ntfyPublishMessage.input.parse({ topic: 'alerts', message: 'x' });
+    const input = ntfyPublishMessage.input.parse({ topic: 'vishnuprksh', message: 'x' });
     await expect(ntfyPublishMessage.handler(input, ctx)).rejects.toMatchObject({
       data: { reason: 'rate_limited' },
     });
@@ -352,7 +362,7 @@ describe('ntfyPublishMessage handler', () => {
     const svc = freshService();
     vi.spyOn(svc, 'publish').mockRejectedValue(invalidParams('Attachment too large for topic'));
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
-    const input = ntfyPublishMessage.input.parse({ topic: 'alerts', message: 'x' });
+    const input = ntfyPublishMessage.input.parse({ topic: 'vishnuprksh', message: 'x' });
     await expect(ntfyPublishMessage.handler(input, ctx)).rejects.toMatchObject({
       data: { reason: 'payload_too_large' },
     });
@@ -373,7 +383,7 @@ describe('ntfyPublishMessage handler', () => {
       ),
     );
     const result = await runToolContract(ntfyPublishMessage, {
-      topic: 'alerts',
+      topic: 'vishnuprksh',
       message: 'x'.repeat(100),
     });
     expect(result).toMatchObject({
@@ -404,7 +414,7 @@ describe('ntfyPublishMessage handler', () => {
       ),
     );
     const result = await runToolContract(ntfyPublishMessage, {
-      topic: 'alerts',
+      topic: 'vishnuprksh',
       message: 'x',
       attach: 'not-a-url',
     });
@@ -423,14 +433,14 @@ describe('ntfyPublishMessage handler', () => {
   it('rejects a multibyte message over 4096 bytes but under 4096 characters', () => {
     // 3000 × 'é' = 3000 UTF-16 units but 6000 UTF-8 bytes.
     expect(() =>
-      ntfyPublishMessage.input.parse({ topic: 'alerts', message: 'é'.repeat(3000) }),
+      ntfyPublishMessage.input.parse({ topic: 'vishnuprksh', message: 'é'.repeat(3000) }),
     ).toThrow(/byte/i);
   });
 
   it('accepts a multibyte message that fits inside the 4096-byte limit', () => {
     // 2000 × 'é' = 4000 UTF-8 bytes.
     const input = ntfyPublishMessage.input.parse({
-      topic: 'alerts',
+      topic: 'vishnuprksh',
       message: 'é'.repeat(2000),
     });
     expect(input.message).toHaveLength(2000);
@@ -450,7 +460,7 @@ describe('ntfyPublishMessage handler', () => {
     );
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
     const input = ntfyPublishMessage.input.parse({
-      topic: 'alerts',
+      topic: 'vishnuprksh',
       message: 'x',
       delay: '30m',
       cache: false,
@@ -483,7 +493,7 @@ describe('ntfyPublishMessage handler', () => {
     async function failedPublish(rejection: McpError, input: Record<string, unknown>) {
       const svc = freshService();
       vi.spyOn(svc, 'publish').mockRejectedValue(rejection);
-      const result = await runToolContract(ntfyPublishMessage, { topic: 'alerts', ...input });
+      const result = await runToolContract(ntfyPublishMessage, { topic: 'vishnuprksh', ...input });
       expect(result.isError).toBe(true);
       const { error } = result.structuredContent as {
         error: {
@@ -641,7 +651,7 @@ describe('ntfyPublishMessage handler', () => {
 
     async function failed(input: Record<string, unknown> = {}) {
       const result = await runToolContract(ntfyPublishMessage, {
-        topic: 'alerts',
+        topic: 'vishnuprksh',
         message: 'x',
         ...input,
       });
@@ -770,7 +780,7 @@ describe('ntfyPublishMessage handler', () => {
       async (code, upstream, reason) => {
         const upstreamFetch = refuse(400, code, upstream, PHONE_DOCS);
         const input = ntfyPublishMessage.input.parse({
-          topic: 'alerts',
+          topic: 'vishnuprksh',
           message: 'x',
           call: '+15555550100',
         });
@@ -788,8 +798,8 @@ describe('ntfyPublishMessage handler', () => {
     const blocks = ntfyPublishMessage.format!({
       id: 'mid_42',
       time: '2023-11-14T22:13:20.000Z',
-      topic: 'alerts',
-      url: 'https://ntfy.test/alerts',
+      topic: 'vishnuprksh',
+      url: 'https://ntfy.test/vishnuprksh',
       expires: '2023-11-14T22:30:00.000Z',
       sequence_id: 'seq_1',
       scheduled: false,
@@ -808,12 +818,12 @@ describe('ntfyPublishMessage handler', () => {
     });
     const text = (blocks[0] as { text: string }).text;
     expect(text).toContain('mid_42');
-    expect(text).toContain('alerts');
+    expect(text).toContain('vishnuprksh');
     // Unscheduled publishes report the accept time under the plain `Time:` label.
     expect(text).toContain('Time: 2023-11-14T22:13:20.000Z');
     expect(text).toContain('Cache expires: 2023-11-14T22:30:00.000Z');
     expect(text).not.toContain('Delivers:');
-    expect(text).toContain('https://ntfy.test/alerts');
+    expect(text).toContain('https://ntfy.test/vishnuprksh');
     expect(text).toContain('Hello');
     expect(text).toContain('world');
     expect(text).toContain('high');
@@ -827,11 +837,11 @@ describe('ntfyPublishMessage handler', () => {
     vi.spyOn(svc, 'publish').mockResolvedValue({
       id: 'mid_43',
       time: 1700000000,
-      topic: 'alerts',
+      topic: 'vishnuprksh',
     });
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
     const input = ntfyPublishMessage.input.parse({
-      topic: 'alerts',
+      topic: 'vishnuprksh',
       message: 'later',
       delay: '30m',
     });
@@ -844,11 +854,11 @@ describe('ntfyPublishMessage handler', () => {
     vi.spyOn(svc, 'publish').mockResolvedValue({
       id: 'mid_44',
       time: 1700000000,
-      topic: 'alerts',
+      topic: 'vishnuprksh',
       scheduled: true,
     });
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
-    const input = ntfyPublishMessage.input.parse({ topic: 'alerts', message: 'queued' });
+    const input = ntfyPublishMessage.input.parse({ topic: 'vishnuprksh', message: 'queued' });
     const result = await ntfyPublishMessage.handler(input, ctx);
     expect(result.scheduled).toBe(true);
   });
@@ -858,10 +868,10 @@ describe('ntfyPublishMessage handler', () => {
     vi.spyOn(svc, 'publish').mockResolvedValue({
       id: 'mid_45',
       time: 1700000000,
-      topic: 'alerts',
+      topic: 'vishnuprksh',
     });
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
-    const input = ntfyPublishMessage.input.parse({ topic: 'alerts', message: 'now' });
+    const input = ntfyPublishMessage.input.parse({ topic: 'vishnuprksh', message: 'now' });
     const result = await ntfyPublishMessage.handler(input, ctx);
     expect(result.scheduled).toBeUndefined();
   });
@@ -871,17 +881,17 @@ describe('ntfyPublishMessage handler', () => {
     const publish = vi.spyOn(svc, 'publish').mockResolvedValue({
       id: 'mid_46',
       time: 1700000000,
-      topic: 'alerts',
+      topic: 'vishnuprksh',
     });
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
     const input = ntfyPublishMessage.input.parse({
-      topic: 'alerts',
+      topic: 'vishnuprksh',
       message: 'hi',
       base_url: 'https://other.example.com/',
     });
     const result = await ntfyPublishMessage.handler(input, ctx);
     expect(publish.mock.calls[0]?.[1]).toMatchObject({ baseUrl: 'https://other.example.com' });
-    expect(result.url).toBe('https://other.example.com/alerts');
+    expect(result.url).toBe('https://other.example.com/vishnuprksh');
   });
 
   it('describes `base_url` credential forwarding as keyed on every registered server', () => {
@@ -904,7 +914,7 @@ describe('ntfyPublishMessage handler', () => {
     );
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
     const input = ntfyPublishMessage.input.parse({
-      topic: 'alerts',
+      topic: 'vishnuprksh',
       message: 'hi',
       base_url: 'http://email.internal.example.com',
     });
@@ -919,7 +929,7 @@ describe('ntfyPublishMessage handler', () => {
     'rejects the %j base_url at the schema boundary',
     (base_url) => {
       expect(() =>
-        ntfyPublishMessage.input.parse({ topic: 'alerts', message: 'hi', base_url }),
+        ntfyPublishMessage.input.parse({ topic: 'vishnuprksh', message: 'hi', base_url }),
       ).toThrow();
     },
   );
@@ -929,17 +939,17 @@ describe('ntfyPublishMessage handler', () => {
     const publish = vi.spyOn(svc, 'publish').mockResolvedValue({
       id: 'mid_47',
       time: 1700000000,
-      topic: 'alerts',
+      topic: 'vishnuprksh',
     });
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
     const input = ntfyPublishMessage.input.parse({
-      topic: 'alerts',
+      topic: 'vishnuprksh',
       message: 'hi',
       base_url: '',
     });
     const result = await ntfyPublishMessage.handler(input, ctx);
     expect(publish.mock.calls[0]?.[1]).toMatchObject({ baseUrl: undefined });
-    expect(result.url).toBe('https://ntfy.test/alerts');
+    expect(result.url).toBe('https://ntfy.test/vishnuprksh');
   });
 
   it('maps a retry-exhausted network error to `upstream_unreachable`', async () => {
@@ -948,7 +958,7 @@ describe('ntfyPublishMessage handler', () => {
       new Error('connection refused (failed after 3 attempts)'),
     );
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
-    const input = ntfyPublishMessage.input.parse({ topic: 'alerts', message: 'x' });
+    const input = ntfyPublishMessage.input.parse({ topic: 'vishnuprksh', message: 'x' });
     await expect(ntfyPublishMessage.handler(input, ctx)).rejects.toMatchObject({
       data: { reason: 'upstream_unreachable' },
     });
@@ -962,7 +972,7 @@ describe('ntfyPublishMessage handler', () => {
       }),
     );
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
-    const input = ntfyPublishMessage.input.parse({ topic: 'alerts', message: 'x' });
+    const input = ntfyPublishMessage.input.parse({ topic: 'vishnuprksh', message: 'x' });
     await expect(ntfyPublishMessage.handler(input, ctx)).rejects.toMatchObject({
       data: { reason: 'upstream_unreachable' },
     });
@@ -1002,7 +1012,10 @@ describe('ntfyPublishMessage handler', () => {
       'fails %s with `upstream_malformed` on both surfaces and publishes once',
       async (_label, text, contentType) => {
         const upstream = stubReply(text, contentType);
-        const result = await runToolContract(ntfyPublishMessage, { topic: 'alerts', message: 'x' });
+        const result = await runToolContract(ntfyPublishMessage, {
+          topic: 'vishnuprksh',
+          message: 'x',
+        });
         expect(upstream).toHaveBeenCalledTimes(1);
         expect(result.isError).toBe(true);
         const { error } = result.structuredContent as {
@@ -1053,7 +1066,7 @@ describe('ntfyPublishMessage handler', () => {
         ),
       );
       const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
-      const input = ntfyPublishMessage.input.parse({ topic: 'alerts', message: 'x' });
+      const input = ntfyPublishMessage.input.parse({ topic: 'vishnuprksh', message: 'x' });
       await expect(ntfyPublishMessage.handler(input, ctx)).rejects.toMatchObject({
         data: { reason: 'upstream_malformed', retryable: false },
       });
@@ -1095,7 +1108,10 @@ describe('ntfyPublishMessage handler', () => {
 
     it('fails a reply reset mid-body with `upstream_malformed` on both surfaces and publishes once (#43)', async () => {
       const upstream = stubCutOffReply();
-      const result = await runToolContract(ntfyPublishMessage, { topic: 'alerts', message: 'x' });
+      const result = await runToolContract(ntfyPublishMessage, {
+        topic: 'vishnuprksh',
+        message: 'x',
+      });
       expect(upstream).toHaveBeenCalledTimes(1);
       const { error } = result.structuredContent as {
         error: { code: number; message: string; data: Record<string, unknown> };
@@ -1122,7 +1138,7 @@ describe('ntfyPublishMessage handler', () => {
       const upstream = stubCutOffReply(() => queueMicrotask(() => caller.abort()));
       const result = await runToolContract(
         ntfyPublishMessage,
-        { topic: 'alerts', message: 'x' },
+        { topic: 'vishnuprksh', message: 'x' },
         { context: { signal: caller.signal } },
       );
       expect(upstream).toHaveBeenCalledTimes(1);
@@ -1154,7 +1170,10 @@ describe('ntfyPublishMessage handler', () => {
         headers: { 'content-type': 'application/json', 'retry-after': '120' },
       });
     });
-    const result = await runToolContract(ntfyPublishMessage, { topic: 'alerts', message: 'x' });
+    const result = await runToolContract(ntfyPublishMessage, {
+      topic: 'vishnuprksh',
+      message: 'x',
+    });
     expect(upstream).toHaveBeenCalledTimes(1);
     const { error } = result.structuredContent as {
       error: { code: number; message: string; data: Record<string, unknown> };
@@ -1182,7 +1201,7 @@ describe('ntfyPublishMessage handler', () => {
     // rebadged; re-throw lets the auto-classifier bubble it correctly.
     vi.spyOn(svc, 'publish').mockRejectedValue(notFound('vanished'));
     const ctx = createMockContext({ errors: ntfyPublishMessage.errors });
-    const input = ntfyPublishMessage.input.parse({ topic: 'alerts', message: 'x' });
+    const input = ntfyPublishMessage.input.parse({ topic: 'vishnuprksh', message: 'x' });
     await expect(ntfyPublishMessage.handler(input, ctx)).rejects.toMatchObject({
       message: expect.stringContaining('vanished'),
     });
@@ -1195,8 +1214,8 @@ describe('ntfyPublishMessage handler', () => {
     const blocks = ntfyPublishMessage.format!({
       id: 'mid_99',
       time: '2026-07-28T13:00:13.000Z',
-      topic: 'alerts',
-      url: 'https://ntfy.test/alerts',
+      topic: 'vishnuprksh',
+      url: 'https://ntfy.test/vishnuprksh',
       scheduled: true,
       actions: [
         { action: 'view', label: 'Open dashboard', url: 'https://example.com/dashboard' },
@@ -1243,17 +1262,17 @@ describe('ntfyPublishMessage handler', () => {
     const ATTACHMENT = { name: 'report](x) (draft).txt', url: 'https://example.invalid/file.txt' };
 
     it('renders every value of a plain publish as a code span or a `text` fence, exact lines', async () => {
-      stubPublish({ topic: 'alerts', ...PLAIN, attachment: ATTACHMENT });
+      stubPublish({ topic: 'vishnuprksh', ...PLAIN, attachment: ATTACHMENT });
       const result = await runToolContract(ntfyPublishMessage, {
-        topic: 'alerts',
+        topic: 'vishnuprksh',
         ...PLAIN,
         attach: ATTACHMENT.url,
         filename: ATTACHMENT.name,
       });
       expect(domainText(result)).toBe(
         [
-          '**Sent** — ntfy accepted message `mid_1` on `alerts`',
-          'URL: `https://ntfy.test/alerts`',
+          '**Sent** — ntfy accepted message `mid_1` on `vishnuprksh`',
+          'URL: `https://ntfy.test/vishnuprksh`',
           'Time: 2023-11-14T22:13:20.000Z',
           'Title: `Review <title> *literal*`',
           '',
@@ -1278,22 +1297,22 @@ describe('ntfyPublishMessage handler', () => {
         { action: 'copy' as const, label: 'Copy', value: 'x' },
       ];
       stubPublish({
-        topic: 'alerts',
+        topic: 'vishnuprksh',
         message: 'body',
         sequence_id: 'seq`1',
         tags: ['warning', 'a`b'],
         actions,
       });
       const result = await runToolContract(ntfyPublishMessage, {
-        topic: 'alerts',
+        topic: 'vishnuprksh',
         message: 'body',
         tags: ['warning', 'a`b'],
         actions,
       });
       expect(domainText(result)).toBe(
         [
-          '**Sent** — ntfy accepted message `mid_1` on `alerts`',
-          'URL: `https://ntfy.test/alerts`',
+          '**Sent** — ntfy accepted message `mid_1` on `vishnuprksh`',
+          'URL: `https://ntfy.test/vishnuprksh`',
           'Time: 2023-11-14T22:13:20.000Z',
           'Sequence ID: ``seq`1``',
           'Tags: `warning` · ``a`b``',
@@ -1312,12 +1331,12 @@ describe('ntfyPublishMessage handler', () => {
 
     it('marks a `text/markdown` echo on both surfaces and fences its source unescaped', async () => {
       stubPublish({
-        topic: 'alerts',
+        topic: 'vishnuprksh',
         message: '**bold** md',
         content_type: 'text/markdown',
       });
       const result = await runToolContract(ntfyPublishMessage, {
-        topic: 'alerts',
+        topic: 'vishnuprksh',
         message: '**bold** md',
         markdown: true,
       });
@@ -1327,13 +1346,13 @@ describe('ntfyPublishMessage handler', () => {
 
     it('moves a title or tag with a line break into its own `text` fence', async () => {
       stubPublish({
-        topic: 'alerts',
+        topic: 'vishnuprksh',
         title: 'a\r\n# Forged heading',
         tags: ['ok', 'two\nlines'],
         message: 'body',
       });
       const result = await runToolContract(ntfyPublishMessage, {
-        topic: 'alerts',
+        topic: 'vishnuprksh',
         title: 'a\r\n# Forged heading',
         tags: ['ok', 'two\nlines'],
         message: 'body',
@@ -1369,7 +1388,7 @@ describe('ntfyPublishMessage consent gate', () => {
     return vi
       .spyOn(globalThis, 'fetch')
       .mockImplementation(async () =>
-        Response.json({ id: 'mid_1', time: 1700000000, event: 'message', topic: 'alerts' }),
+        Response.json({ id: 'mid_1', time: 1700000000, event: 'message', topic: 'vishnuprksh' }),
       );
   }
 
@@ -1390,7 +1409,7 @@ describe('ntfyPublishMessage consent gate', () => {
   const BROADCAST_ACTION = { action: 'broadcast', label: 'Run macro' } as const;
 
   const inputWith = (extra: Record<string, unknown>) =>
-    ntfyPublishMessage.input.parse({ topic: 'alerts', message: 'hi', ...extra });
+    ntfyPublishMessage.input.parse({ topic: 'vishnuprksh', message: 'hi', ...extra });
 
   /** The elicitation params the first round hands back to the client. */
   function confirmRequest(asked: InputRequiredResult): ElicitParams {
@@ -1419,7 +1438,7 @@ describe('ntfyPublishMessage consent gate', () => {
 
     const { message } = confirmRequest(await firstRound(extra));
 
-    expect(message).toContain('alerts');
+    expect(message).toContain('vishnuprksh');
     expect(message).toContain(expected);
     expect(upstream).not.toHaveBeenCalled();
   });
@@ -1455,7 +1474,7 @@ describe('ntfyPublishMessage consent gate', () => {
     );
 
     expect(message).toBe(
-      'Publish to ntfy topic `alerts` with an email forward to `[safe](https://evil)` and a voice call to `*+1555*` and an HTTP `<b>PATCH</b>` button targeting `` https://e.x/`a` `` and an Android broadcast intent (`_io.custom_`) and an Android broadcast intent (default intent)?',
+      'Publish to ntfy topic `vishnuprksh` with an email forward to `[safe](https://evil)` and a voice call to `*+1555*` and an HTTP `<b>PATCH</b>` button targeting `` https://e.x/`a` `` and an Android broadcast intent (`_io.custom_`) and an Android broadcast intent (default intent)?',
     );
   });
 
@@ -1474,12 +1493,12 @@ describe('ntfyPublishMessage consent gate', () => {
       ),
     ).catch((e: unknown) => e)) as McpError;
     expect(err).toMatchObject({
-      message: 'Publish to "alerts" was not confirmed.',
+      message: 'Publish to "vishnuprksh" was not confirmed.',
       data: { reason: 'consent_declined' },
     });
     // `content[]` is the message as the framework escapes it; a parse reads it back exactly.
     expect(readCommonMark(`Error: ${escapeMarkdownInline(err.message)}`)).toBe(
-      'Error: Publish to "alerts" was not confirmed.',
+      'Error: Publish to "vishnuprksh" was not confirmed.',
     );
   });
 
@@ -1541,7 +1560,7 @@ describe('ntfyPublishMessage consent gate', () => {
 
     expect(upstream).toHaveBeenCalledOnce();
     expect(String(upstream.mock.calls[0]?.[0])).toBe('https://ntfy.test/');
-    expect(sentBody(upstream)).toMatchObject({ topic: 'alerts', email: 'ops@example.com' });
+    expect(sentBody(upstream)).toMatchObject({ topic: 'vishnuprksh', email: 'ops@example.com' });
     expect(result.id).toBe('mid_1');
   });
 
@@ -1615,7 +1634,6 @@ describe('ntfyPublishMessage consent gate', () => {
     ['another email recipient', { email: 'attacker@example.com' }],
     ['another message body', { ...EMAIL, message: 'something else' }],
     ['an added voice call', { ...EMAIL, call: '+15551234567' }],
-    ['another topic', { ...EMAIL, topic: 'other' }],
     ['another ntfy server', { ...EMAIL, base_url: 'https://other.example.com' }],
   ])('asks again when the record was minted for %s', async (_label, overrides) => {
     const upstream = fakeUpstream();
@@ -1633,7 +1651,7 @@ describe('ntfyPublishMessage consent gate', () => {
     const asked = await expectInputRequired(() =>
       ntfyManageMessage.handler(
         ntfyManageMessage.input.parse({
-          topic: 'alerts',
+          topic: 'vishnuprksh',
           sequence_id: 'seq_1',
           operation: 'delete',
         }),
