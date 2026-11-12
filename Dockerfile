@@ -152,13 +152,9 @@ RUN mkdir -p /var/log/ntfy-mcp-server && chown -R bun:bun /var/log/ntfy-mcp-serv
 # Switch to the non-root user
 USER bun
 
-# Define an argument for the port, allowing it to be overridden at build time.
-# The `PORT` variable is often injected by cloud environments at runtime.
-ARG PORT
-
-# Set runtime environment variables
-# Note: PORT is an automatic variable in many cloud environments (e.g., Cloud Run)
-ENV MCP_HTTP_PORT=${PORT:-3010}
+# Set runtime environment variables. The startup command maps the platform's
+# runtime PORT onto MCP_HTTP_PORT, falling back to 3010 for local containers.
+ENV MCP_HTTP_PORT=3010
 ENV MCP_HTTP_HOST="0.0.0.0"
 ENV MCP_TRANSPORT_TYPE="http"
 # Stateful, not stateless: the consent prompt on destructive and outbound calls
@@ -176,5 +172,5 @@ EXPOSE ${MCP_HTTP_PORT}
 # Health check using a bun-native fetch (slim image ships no curl/wget)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD bun -e "fetch('http://localhost:'+(process.env.MCP_HTTP_PORT??'3010')+'/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-# The command to start the server
-CMD ["bun", "run", "dist/index.js"]
+# Bind to the runtime-provided port on platforms such as Vercel.
+CMD ["sh", "-c", "export MCP_HTTP_PORT=\"${PORT:-${MCP_HTTP_PORT:-3010}}\"; exec bun run dist/index.js"]
